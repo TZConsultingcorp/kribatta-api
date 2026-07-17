@@ -1,8 +1,58 @@
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
+  }
 
-Parameter	Description	Example
-ccode	TU_CCODE
-Do not expose this key to the players	
-name	Player name. Optional	William Mills
-account	Player Account or Code in your system (This is the identifier that will show on reports and sent in callbacks)	STO8311
-session_key	An unique session key	d98a6fa00744a50a8dd869d8223fd877
-agent	OPTIONAL. Agent code if related	AF7719
+  const { name, account } = req.body;
+
+  const ccode = process.env.KRIBATTA_CCODE;
+
+  if (!ccode) {
+    return res.status(500).json({
+      error: "Missing KRIBATTA_CCODE"
+    });
+  }
+
+  if (!account) {
+    return res.status(400).json({
+      error: "Missing account"
+    });
+  }
+
+  const session_key = crypto.randomUUID().replace(/-/g, "");
+
+  const data = new URLSearchParams();
+
+  data.append("ccode", ccode);
+  data.append("name", name || "Customer");
+  data.append("account", account);
+  data.append("session_key", session_key);
+
+  try {
+    const kribattaResponse = await fetch(
+      "https://kribatta.com/online_tools/enroll.php",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: data
+      }
+    );
+
+    const result = await kribattaResponse.json();
+
+    return res.status(200).json({
+      result,
+      account,
+      session_key
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message
+    });
+  }
+}
