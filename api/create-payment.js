@@ -1,0 +1,69 @@
+import crypto from "crypto";
+
+export default async function handler(req, res) {
+
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      error: "Method not allowed"
+    });
+  }
+
+  const { name, email, amount } = req.body;
+
+  const ccode = process.env.KRIBATTA_CCODE;
+
+  if (!ccode) {
+    return res.status(500).json({
+      error: "Missing KRIBATTA_CCODE"
+    });
+  }
+
+  if (!amount) {
+    return res.status(400).json({
+      error: "Missing amount"
+    });
+  }
+
+  const account = "TOUR-" + Date.now();
+
+  const session_key = crypto.randomUUID().replace(/-/g, "");
+
+  const data = new URLSearchParams();
+
+  data.append("ccode", ccode);
+  data.append("name", name || "Customer");
+  data.append("account", account);
+  data.append("session_key", session_key);
+
+  try {
+
+    const kribattaResponse = await fetch(
+      "https://kribatta.com/online_tools/enroll.php",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: data
+      }
+    );
+
+    const result = await kribattaResponse.json();
+
+    return res.status(200).json({
+      result,
+      account,
+      session_key,
+      amount,
+      cid: 9
+    });
+
+  } catch (error) {
+
+    return res.status(500).json({
+      error: error.message
+    });
+
+  }
+
+}
